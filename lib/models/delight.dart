@@ -81,7 +81,7 @@ class RuntimeStatus {
 
   const RuntimeStatus({
     this.healthy = false,
-    this.version = '0.3.210',
+    this.version = '1.0.5',
     required this.startTime,
     this.totalEvents = 0,
     this.recommendationPoolSize = 0,
@@ -100,7 +100,7 @@ class RuntimeStatus {
 
   factory RuntimeStatus.fromJson(Map<String, dynamic> json) => RuntimeStatus(
         healthy: json['healthy'] == true,
-        version: json['version']?.toString() ?? '0.3.210',
+        version: json['version']?.toString() ?? '1.0.5',
         startTime: DateTime.tryParse(json['start_time']?.toString() ?? '') ??
             DateTime.now(),
         totalEvents: (json['total_events'] as num?)?.toInt() ?? 0,

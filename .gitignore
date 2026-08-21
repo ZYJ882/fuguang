@@ -1,0 +1,30 @@
+# Dart / Flutter generated files
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+build/
+
+# Android generated files and local SDK configuration
+android/.gradle/
+android/local.properties
+android/app/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+key.properties
+
+# IDE and operating-system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Local application data and secrets
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*

@@ -1,0 +1,2 @@
+3f9f29699b3cca256cabcf6cd51cda3116d62262bdd72af8b3be0995a71fe617  fuguang-1.0.6.apk
+728187a1785d96968ff522efa8a2b0a159afd6c6db11a290577da4575d2febb3  fuguang-1.0.6-source.zip

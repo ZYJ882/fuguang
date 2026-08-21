@@ -1,10 +1,20 @@
 # 浮光 —— 纯安卓本地运行的跨平台个性化内容推荐应用 —— 纯安卓本地运行的跨平台个性化内容推荐 Agent
 
-> 「浮光」基于 [OpenBiliClaw](https://github.com/whiteguo233/OpenBiliClaw) 和 [OpenBiliClaw-mobile](https://github.com/whiteguo233/OpenBiliClaw-mobile) 复现，**无需电脑、无需自部署服务器**，所有后端逻辑在安卓本地运行。
+> **纯本地运行的个性化内容推荐应用。** 无需服务器，核心数据保存在设备本机，LLM 能力使用你自行配置的服务商 API Key。
+
+## 最新版本
+
+当前正式版本为 **1.0.5**。可在 [GitHub Releases](https://github.com/ZYJ882/fuguang/releases/tag/v1.0.5) 下载 Android APK；仓库内的 [发布目录](releases/v1.0.5/) 同步保留安装包、对应源码、校验文件和安装说明。
+
+| 文件 | 用途 |
+|---|---|
+| `fuguang-1.0.5.apk` | Android 安装包。 |
+| `fuguang-1.0.5-source.zip` | 与该版本一致的完整源码。 |
+| `SHA256SUMS.txt` | 发布文件的 SHA-256 校验值。 |
 
 ## 项目简介
 
-浮光是一个纯本地运行的个性化内容推荐应用。原版采用「Python 后端 + Flutter 前端」架构，需要在电脑或服务器上运行后端服务。本项目将所有后端逻辑（画像引擎、推荐引擎、对话系统、内容来源适配）用 Dart 重写，直接在安卓设备本地运行，数据全部存储在本机 SQLite 中。
+浮光是一个纯本地运行的个性化内容推荐应用。画像引擎、推荐引擎、对话系统与内容来源适配均直接在安卓设备运行，数据存储在本机 SQLite 中。
 
 ### 核心特性
 

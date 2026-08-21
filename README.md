@@ -4,17 +4,17 @@
 
 ## 最新版本
 
-当前正式版本为 **1.0.6**。可在 [GitHub Releases](https://github.com/ZYJ882/fuguang/releases/tag/v1.0.6) 下载 Android APK；仓库内的 [发布目录](releases/v1.0.6/) 同步保留安装包、对应源码、校验文件和安装说明。
+当前正式版本为 **1.0.7**。可在 [GitHub Releases](https://github.com/ZYJ882/fuguang/releases/tag/v1.0.7) 下载 Android APK；仓库内的 [发布目录](releases/v1.0.7/) 同步保留安装包、对应源码、校验文件和安装说明。
 
 | 文件 | 用途 |
 |---|---|
-| `fuguang-1.0.6.apk` | Android 安装包。 |
-| `fuguang-1.0.6-source.zip` | 与该版本一致的完整源码。 |
+| `fuguang-1.0.7.apk` | Android 安装包。 |
+| `fuguang-1.0.7-source.zip` | 与该版本一致的完整源码。 |
 | `SHA256SUMS.txt` | 发布文件的 SHA-256 校验值。 |
 
 ## 项目简介
 
-浮光是一个纯本地运行的个性化内容推荐应用。画像引擎、推荐引擎、对话系统与内容来源适配均直接在安卓设备运行，数据存储在本机 SQLite 中。1.0.6 新增 B 站扫码或 Cookie 登录入口。
+浮光是一个纯本地运行的个性化内容推荐应用。画像引擎、推荐引擎、对话系统与内容来源适配均直接在安卓设备运行，数据存储在本机 SQLite 中。1.0.7 扩展了 B 站密码、短信、扫码与 Cookie 登录入口，并在触发时显示由用户亲自完成的极验安全验证。
 
 ### 核心特性
 

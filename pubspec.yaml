@@ -1,7 +1,7 @@
 name: fuguang
 description: 浮光——纯本地运行的跨平台个性化内容推荐应用
 publish_to: 'none'
-version: 1.0.6+7
+version: 1.0.7+8
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -49,6 +49,8 @@ dependencies:
   webview_flutter: ^4.8.0
   # 二维码生成（B站扫码登录）
   qr_flutter: ^4.1.0
+  # RSA加密（B站密码登录）
+  encrypt: ^5.0.3
 
 
 dev_dependencies:

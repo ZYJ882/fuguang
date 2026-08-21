@@ -293,7 +293,7 @@ class _SettingsViewState extends State<SettingsView> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('浮光'),
-                  subtitle: Text('v1.0.6 · 纯本地运行 · 无需服务器'),
+                  subtitle: Text('v1.0.7 · 纯本地运行 · 无需服务器'),
                 ),
                 const Divider(height: 1),
                 ListTile(

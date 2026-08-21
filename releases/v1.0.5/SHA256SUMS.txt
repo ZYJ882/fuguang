@@ -1,0 +1,2 @@
+aeb092c9c265033b9e35471d16ebccdc26c049fe0d32b9bc6359ca3cfa535b25  fuguang-1.0.5.apk
+f8ae4bb27dbd2a6e4c71fc9c03b73c000a093b5304605f46e60b1b64685df522  fuguang-1.0.5-source.zip

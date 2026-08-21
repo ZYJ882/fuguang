@@ -23,7 +23,8 @@ class AppDatabase {
       version: 1,
       onCreate: _onCreate,
       onConfigure: (db) async {
-        await db.execute('PRAGMA journal_mode = WAL');
+        // journal_mode 会返回查询结果，Android SQLite 仅允许通过 rawQuery 执行此类 PRAGMA。
+        await db.rawQuery('PRAGMA journal_mode = WAL');
         await db.execute('PRAGMA foreign_keys = ON');
       },
     );
@@ -44,9 +45,12 @@ class AppDatabase {
         processed INTEGER DEFAULT 0
       )
     ''');
-    await db.execute('CREATE INDEX idx_events_type ON behavior_events(event_type)');
-    await db.execute('CREATE INDEX idx_events_created ON behavior_events(created_at)');
-    await db.execute('CREATE INDEX idx_events_content ON behavior_events(content_id)');
+    await db
+        .execute('CREATE INDEX idx_events_type ON behavior_events(event_type)');
+    await db.execute(
+        'CREATE INDEX idx_events_created ON behavior_events(created_at)');
+    await db.execute(
+        'CREATE INDEX idx_events_content ON behavior_events(content_id)');
 
     await db.execute('''
       CREATE TABLE recommendation_pool (
@@ -84,9 +88,12 @@ class AppDatabase {
         click_count INTEGER DEFAULT 0
       )
     ''');
-    await db.execute('CREATE INDEX idx_pool_source ON recommendation_pool(source_platform)');
-    await db.execute('CREATE INDEX idx_pool_match ON recommendation_pool(match_score)');
-    await db.execute('CREATE INDEX idx_pool_fresh ON recommendation_pool(freshness)');
+    await db.execute(
+        'CREATE INDEX idx_pool_source ON recommendation_pool(source_platform)');
+    await db.execute(
+        'CREATE INDEX idx_pool_match ON recommendation_pool(match_score)');
+    await db.execute(
+        'CREATE INDEX idx_pool_fresh ON recommendation_pool(freshness)');
 
     await db.execute('''
       CREATE TABLE user_profile (
@@ -179,8 +186,10 @@ class AppDatabase {
         match_score REAL DEFAULT 0
       )
     ''');
-    await db.execute('CREATE INDEX idx_history_type ON content_history(history_type)');
-    await db.execute('CREATE INDEX idx_history_event ON content_history(event_at)');
+    await db.execute(
+        'CREATE INDEX idx_history_type ON content_history(history_type)');
+    await db
+        .execute('CREATE INDEX idx_history_event ON content_history(event_at)');
 
     await db.execute('''
       CREATE TABLE delight_cards (
@@ -210,7 +219,8 @@ class AppDatabase {
       )
     ''');
     await db.execute('CREATE INDEX idx_notif_read ON app_notifications(read)');
-    await db.execute('CREATE INDEX idx_notif_created ON app_notifications(created_at)');
+    await db.execute(
+        'CREATE INDEX idx_notif_created ON app_notifications(created_at)');
 
     await db.execute('''
       CREATE TABLE pending_confirmations (

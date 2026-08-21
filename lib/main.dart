@@ -21,7 +21,8 @@ class FuguangApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => SavedProvider()),
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(
+            create: (_) => SettingsProvider()..loadSettings()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
@@ -30,7 +31,7 @@ class FuguangApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.system,
+            themeMode: settings.themeMode,
             home: const _AppInitializer(),
           );
         },
@@ -53,7 +54,8 @@ class _AppInitializer extends StatelessWidget {
             children: [
               const CircularProgressIndicator(),
               const SizedBox(height: 16),
-              Text(appState.error ?? '正在初始化...', style: const TextStyle(color: Colors.grey)),
+              Text(appState.error ?? '正在初始化...',
+                  style: const TextStyle(color: Colors.grey)),
             ],
           ),
         ),

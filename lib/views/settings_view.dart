@@ -207,12 +207,22 @@ class _SettingsViewState extends State<SettingsView> {
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Column(
               children: [
-                SwitchListTile(
-                  title: const Text('深色模式'),
-                  subtitle: const Text('跟随系统或手动切换'),
-                  value: provider.darkMode,
-                  onChanged: (value) => provider.setDarkMode(value),
-                  secondary: const Icon(Icons.dark_mode),
+                ListTile(
+                  leading: const Icon(Icons.brightness_6_outlined),
+                  title: const Text('显示模式'),
+                  subtitle: Text(_themeModeDescription(provider.themeMode)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _themeModeTitle(provider.themeMode),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
+                  onTap: () => _showThemeModePicker(provider.themeMode),
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
@@ -233,7 +243,7 @@ class _SettingsViewState extends State<SettingsView> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('浮光'),
-                  subtitle: Text('v0.3.211 · 纯本地运行 · 无需服务器'),
+                  subtitle: Text('v0.3.212 · 纯本地运行 · 无需服务器'),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -457,6 +467,67 @@ class _SettingsViewState extends State<SettingsView> {
     if (!silent && mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('配置已保存')));
+    }
+  }
+
+  String _themeModeTitle(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.system:
+        return '跟随系统';
+      case ThemeMode.dark:
+        return '深色模式';
+      case ThemeMode.light:
+        return '浅色模式';
+    }
+  }
+
+  String _themeModeDescription(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.system:
+        return '使用设备当前的显示外观';
+      case ThemeMode.dark:
+        return '始终使用深色界面';
+      case ThemeMode.light:
+        return '始终使用浅色界面';
+    }
+  }
+
+  Future<void> _showThemeModePicker(ThemeMode currentMode) async {
+    final selected = await showDialog<ThemeMode>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('选择显示模式'),
+        contentPadding: const EdgeInsets.only(top: 8),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              value: ThemeMode.system,
+              groupValue: currentMode,
+              title: const Text('跟随系统'),
+              subtitle: const Text('自动使用设备当前的深色或浅色外观'),
+              onChanged: (mode) => Navigator.pop(dialogContext, mode),
+            ),
+            RadioListTile<ThemeMode>(
+              value: ThemeMode.dark,
+              groupValue: currentMode,
+              title: const Text('深色模式'),
+              subtitle: const Text('始终使用深色界面'),
+              onChanged: (mode) => Navigator.pop(dialogContext, mode),
+            ),
+            RadioListTile<ThemeMode>(
+              value: ThemeMode.light,
+              groupValue: currentMode,
+              title: const Text('浅色模式'),
+              subtitle: const Text('始终使用浅色界面'),
+              onChanged: (mode) => Navigator.pop(dialogContext, mode),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      await context.read<SettingsProvider>().setThemeMode(selected);
     }
   }
 

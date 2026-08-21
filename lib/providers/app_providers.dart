@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
 import '../models/recommendation.dart';
 import '../models/profile.dart';
 import '../models/chat.dart';
@@ -371,6 +373,7 @@ class SavedProvider extends ChangeNotifier {
 }
 
 class SettingsProvider extends ChangeNotifier {
+  static const _themeModeConfigKey = 'theme_mode';
   final LLMService _llm = LLMService.instance;
   final SourceManager _sources = SourceManager.instance;
   final AppRepository _repo = AppRepository();
@@ -381,8 +384,9 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, bool> _sourceEnabled = {};
   Map<String, bool> get sourceEnabled => _sourceEnabled;
 
-  bool _darkMode = false;
-  bool get darkMode => _darkMode;
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
+  bool get darkMode => _themeMode == ThemeMode.dark;
 
   bool _autoSync = true;
   bool get autoSync => _autoSync;
@@ -405,7 +409,23 @@ class SettingsProvider extends ChangeNotifier {
         final config = _sources.getConfig(platform);
         _sourceEnabled[platform] = config?.enabled ?? true;
       }
-      _darkMode = (await _repo.getConfig('dark_mode')) == 'true';
+      final storedThemeMode = await _repo.getConfig(_themeModeConfigKey);
+      switch (storedThemeMode) {
+        case 'light':
+          _themeMode = ThemeMode.light;
+          break;
+        case 'dark':
+          _themeMode = ThemeMode.dark;
+          break;
+        case 'system':
+          _themeMode = ThemeMode.system;
+          break;
+        default:
+          // 兼容旧版：原“深色模式”关闭时等同于跟随系统。
+          _themeMode = (await _repo.getConfig('dark_mode')) == 'true'
+              ? ThemeMode.dark
+              : ThemeMode.system;
+      }
       _autoSync = (await _repo.getConfig('auto_sync')) != 'false';
     } finally {
       _isLoading = false;
@@ -444,10 +464,15 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setDarkMode(bool value) async {
-    _darkMode = value;
-    await _repo.setConfig('dark_mode', value.toString());
+  Future<void> setThemeMode(ThemeMode value) async {
+    _themeMode = value;
+    await _repo.setConfig(_themeModeConfigKey, value.name);
     notifyListeners();
+  }
+
+  // 保留旧调用入口，方便平滑兼容后续代码。
+  Future<void> setDarkMode(bool value) {
+    return setThemeMode(value ? ThemeMode.dark : ThemeMode.system);
   }
 
   Future<void> setAutoSync(bool value) async {

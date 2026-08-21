@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../providers/app_providers.dart';
 import '../llm/llm_service.dart';
+import '../services/bilibili_auth.dart';
+import 'bilibili_login_view.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -65,31 +68,35 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   Text(
                     '支持 OpenAI 兼容接口与 Claude 原生 Messages API；API Key 仅保存于设备安全存储。',
-                    style:
-                        theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     '当前服务：${LLMProviderPreset.fromId(_selectedProvider).name} · ${LLMProviderPreset.fromId(_selectedProvider).description}',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.primary),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _apiKeyController,
                     decoration: const InputDecoration(
-                        labelText: 'API Key',
-                        prefixIcon: Icon(Icons.key),
-                        hintText: 'sk-...'),
+                      labelText: 'API Key',
+                      prefixIcon: Icon(Icons.key),
+                      hintText: 'sk-...',
+                    ),
                     obscureText: true,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _baseUrlController,
                     decoration: const InputDecoration(
-                        labelText: 'Base URL',
-                        prefixIcon: Icon(Icons.link),
-                        hintText: 'https://api.openai.com/v1'),
+                      labelText: 'Base URL',
+                      prefixIcon: Icon(Icons.link),
+                      hintText: 'https://api.openai.com/v1',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -117,7 +124,10 @@ class _SettingsViewState extends State<SettingsView> {
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
                               : const Icon(Icons.sync),
                           label: const Text('测试连接'),
                         ),
@@ -137,24 +147,29 @@ class _SettingsViewState extends State<SettingsView> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                          color: _connectionResult!.contains('成功')
-                              ? Colors.green.withOpacity(0.1)
-                              : Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8)),
+                        color: _connectionResult!.contains('成功')
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: Row(
                         children: [
                           Icon(
-                              _connectionResult!.contains('成功')
-                                  ? Icons.check_circle
-                                  : Icons.error,
-                              color: _connectionResult!.contains('成功')
-                                  ? Colors.green
-                                  : Colors.red,
-                              size: 18),
+                            _connectionResult!.contains('成功')
+                                ? Icons.check_circle
+                                : Icons.error,
+                            color: _connectionResult!.contains('成功')
+                                ? Colors.green
+                                : Colors.red,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
-                              child: Text(_connectionResult!,
-                                  style: theme.textTheme.bodySmall)),
+                            child: Text(
+                              _connectionResult!,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -166,21 +181,54 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ),
           _buildSectionHeader('内容来源', theme),
-          ...['bilibili', 'xiaohongshu', 'douyin', 'zhihu', 'web']
-              .map((platform) {
+          // B站 —— 支持扫码登录（复刻PiliPlus方式）
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: ListTile(
+              leading: _SourceIcon(platform: 'bilibili'),
+              title: const Text('B站'),
+              subtitle: Text(
+                provider.bilibiliLoggedIn
+                    ? '已登录: ${provider.bilibiliUserName ?? '用户'}'
+                    : '点击登录（扫码/Cookie）',
+                style: TextStyle(
+                  color: provider.bilibiliLoggedIn
+                      ? Colors.green
+                      : theme.colorScheme.primary,
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (provider.bilibiliLoggedIn)
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.red),
+                      tooltip: '退出登录',
+                      onPressed: () => _logoutBilibili(),
+                    ),
+                  Switch(
+                    value: provider.sourceEnabled['bilibili'] ?? true,
+                    onChanged: (value) =>
+                        provider.setSourceEnabled('bilibili', value),
+                  ),
+                ],
+              ),
+              onTap: () => _openBilibiliLogin(),
+            ),
+          ),
+          // 其他来源
+          ...['xiaohongshu', 'douyin', 'zhihu', 'web'].map((platform) {
             final labels = {
-              'bilibili': 'B站',
               'xiaohongshu': '小红书',
               'douyin': '抖音',
               'zhihu': '知乎',
-              'web': '通用网页'
+              'web': '通用网页',
             };
             final requiresAuth = {
-              'bilibili': false,
               'xiaohongshu': true,
               'douyin': true,
               'zhihu': false,
-              'web': false
+              'web': false,
             };
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -196,8 +244,10 @@ class _SettingsViewState extends State<SettingsView> {
                       provider.setSourceEnabled(platform, value),
                 ),
                 onTap: requiresAuth[platform] == true
-                    ? () =>
-                        _showCookieInput(platform, labels[platform] ?? platform)
+                    ? () => _showCookieInput(
+                          platform,
+                          labels[platform] ?? platform,
+                        )
                     : null,
               ),
             );
@@ -243,7 +293,7 @@ class _SettingsViewState extends State<SettingsView> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('浮光'),
-                  subtitle: Text('v1.0.5 · 纯本地运行 · 无需服务器'),
+                  subtitle: Text('v1.0.6 · 纯本地运行 · 无需服务器'),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -272,17 +322,18 @@ class _SettingsViewState extends State<SettingsView> {
   Widget _buildSectionHeader(String title, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(title,
-          style: theme.textTheme.titleSmall
-              ?.copyWith(color: Colors.grey, fontWeight: FontWeight.bold)),
+      child: Text(
+        title,
+        style: theme.textTheme.titleSmall?.copyWith(
+          color: Colors.grey,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
   Widget _buildPresetButtons() {
-    final presets = [
-      ...LLMProviderPreset.presets,
-      LLMProviderPreset.custom,
-    ];
+    final presets = [...LLMProviderPreset.presets, LLMProviderPreset.custom];
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -301,8 +352,9 @@ class _SettingsViewState extends State<SettingsView> {
 
   Future<void> _switchProvider(String providerId) async {
     await _saveLLMConfig(silent: true);
-    final config =
-        await context.read<SettingsProvider>().selectLLMProvider(providerId);
+    final config = await context.read<SettingsProvider>().selectLLMProvider(
+          providerId,
+        );
     if (!mounted) return;
     setState(() {
       _selectedProvider = config.provider;
@@ -320,9 +372,8 @@ class _SettingsViewState extends State<SettingsView> {
     ModelListResult result = await settings.fetchLLMModels();
     if (!mounted) return;
     if (!result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? '无法加载模型列表')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(result.error ?? '无法加载模型列表')));
       return;
     }
 
@@ -335,8 +386,9 @@ class _SettingsViewState extends State<SettingsView> {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             final visibleModels = models
-                .where((model) =>
-                    model.toLowerCase().contains(query.toLowerCase()))
+                .where(
+                  (model) => model.toLowerCase().contains(query.toLowerCase()),
+                )
                 .toList();
             return AlertDialog(
               title: Row(
@@ -400,8 +452,10 @@ class _SettingsViewState extends State<SettingsView> {
                                   dense: true,
                                   title: Text(model),
                                   trailing: model == _modelController.text
-                                      ? const Icon(Icons.check,
-                                          color: Colors.green)
+                                      ? const Icon(
+                                          Icons.check,
+                                          color: Colors.green,
+                                        )
                                       : null,
                                   onTap: () {
                                     setState(() {
@@ -436,9 +490,8 @@ class _SettingsViewState extends State<SettingsView> {
       mode: LaunchMode.externalApplication,
     );
     if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无法打开 GitHub 项目链接')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('无法打开 GitHub 项目链接')));
     }
   }
 
@@ -531,6 +584,60 @@ class _SettingsViewState extends State<SettingsView> {
     }
   }
 
+  // === B站登录（复刻PiliPlus扫码登录方式） ===
+  void _openBilibiliLogin() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BilibiliLoginView(
+          onLoginResult: (success, userInfo) async {
+            if (success && userInfo != null) {
+              final auth = BilibiliAuthService();
+              final cookies = auth.cookies ?? '';
+              final userName = userInfo['uname'] ?? userInfo['name'] ?? 'B站用户';
+              await context.read<SettingsProvider>().loginBilibili(
+                    cookies: cookies,
+                    userName: userName,
+                    accessToken: auth.accessToken,
+                  );
+              if (mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text('B站登录成功: $userName')));
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _logoutBilibili() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出B站登录'),
+        content: const Text('确定要退出B站登录吗？退出后将无法获取个性化推荐内容。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await context.read<SettingsProvider>().logoutBilibili();
+              BilibiliAuthService().logout();
+              if (mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('已退出B站登录')));
+              }
+            },
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCookieInput(String platform, String label) {
     final controller = TextEditingController();
     showDialog(
@@ -540,24 +647,32 @@ class _SettingsViewState extends State<SettingsView> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('在浏览器登录对应平台后，复制 Cookie 粘贴到下方：',
-                style: TextStyle(fontSize: 13)),
+            const Text(
+              '在浏览器登录对应平台后，复制 Cookie 粘贴到下方：',
+              style: TextStyle(fontSize: 13),
+            ),
             const SizedBox(height: 12),
             TextField(
-                controller: controller,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                    hintText: '粘贴 Cookie...', border: OutlineInputBorder())),
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: '粘贴 Cookie...',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
           FilledButton(
             onPressed: () {
-              context
-                  .read<SettingsProvider>()
-                  .setSourceCookies(platform, controller.text.trim());
+              context.read<SettingsProvider>().setSourceCookies(
+                    platform,
+                    controller.text.trim(),
+                  );
               Navigator.pop(context);
               ScaffoldMessenger.of(context)
                   .showSnackBar(const SnackBar(content: Text('Cookie 已保存')));
@@ -591,8 +706,9 @@ class _SettingsViewState extends State<SettingsView> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('我知道了'))
+            onPressed: () => Navigator.pop(context),
+            child: const Text('我知道了'),
+          ),
         ],
       ),
     );
@@ -610,21 +726,26 @@ class _SourceIcon extends StatelessWidget {
       'xiaohongshu': Icons.book,
       'douyin': Icons.music_note,
       'zhihu': Icons.question_answer,
-      'web': Icons.language
+      'web': Icons.language,
     };
     final colors = {
       'bilibili': const Color(0xFFFB7299),
       'xiaohongshu': const Color(0xFFFF2442),
       'douyin': Colors.black,
       'zhihu': const Color(0xFF0066FF),
-      'web': Colors.grey
+      'web': Colors.grey,
     };
     return Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-            color: (colors[platform] ?? Colors.grey).withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8)),
-        child: Icon(icons[platform] ?? Icons.language,
-            color: colors[platform] ?? Colors.grey, size: 20));
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: (colors[platform] ?? Colors.grey).withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        icons[platform] ?? Icons.language,
+        color: colors[platform] ?? Colors.grey,
+        size: 20,
+      ),
+    );
   }
 }

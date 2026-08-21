@@ -278,10 +278,16 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> respondToConfirmation(String ref, String response,
-      {String? discussion}) async {
+  Future<void> respondToConfirmation(
+    String ref,
+    String response, {
+    String? discussion,
+  }) async {
     await _engine.respondToConfirmation(
-        ref: ref, response: response, discussion: discussion);
+      ref: ref,
+      response: response,
+      discussion: discussion,
+    );
     await loadNotifications();
   }
 }
@@ -391,6 +397,12 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoSync = true;
   bool get autoSync => _autoSync;
 
+  // === B站登录状态（复刻PiliPlus登录方式） ===
+  bool _bilibiliLoggedIn = false;
+  bool get bilibiliLoggedIn => _bilibiliLoggedIn;
+  String? _bilibiliUserName;
+  String? get bilibiliUserName => _bilibiliUserName;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -404,7 +416,7 @@ class SettingsProvider extends ChangeNotifier {
         'xiaohongshu',
         'douyin',
         'zhihu',
-        'web'
+        'web',
       ]) {
         final config = _sources.getConfig(platform);
         _sourceEnabled[platform] = config?.enabled ?? true;
@@ -427,6 +439,13 @@ class SettingsProvider extends ChangeNotifier {
               : ThemeMode.system;
       }
       _autoSync = (await _repo.getConfig('auto_sync')) != 'false';
+      // 加载B站登录状态
+      final bilibiliCreds = await _repo.getCredentials('bilibili');
+      if (bilibiliCreds.isNotEmpty &&
+          bilibiliCreds['cookies']?.isNotEmpty == true) {
+        _bilibiliLoggedIn = true;
+        _bilibiliUserName = await _repo.getConfig('bilibili_username');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -461,6 +480,31 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setSourceCookies(String platform, String cookies) async {
     await _sources.setSourceCookies(platform, cookies);
+    notifyListeners();
+  }
+
+  // === B站登录（复刻PiliPlus扫码登录方式） ===
+  Future<void> loginBilibili({
+    required String cookies,
+    required String userName,
+    String? accessToken,
+  }) async {
+    await _sources.setSourceCookies('bilibili', cookies);
+    await _repo.setConfig('bilibili_username', userName);
+    if (accessToken != null) {
+      await _repo.setConfig('bilibili_access_token', accessToken);
+    }
+    _bilibiliLoggedIn = true;
+    _bilibiliUserName = userName;
+    notifyListeners();
+  }
+
+  Future<void> logoutBilibili() async {
+    await _sources.setSourceCookies('bilibili', '');
+    await _repo.setConfig('bilibili_username', '');
+    await _repo.setConfig('bilibili_access_token', '');
+    _bilibiliLoggedIn = false;
+    _bilibiliUserName = null;
     notifyListeners();
   }
 

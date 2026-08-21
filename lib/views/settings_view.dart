@@ -16,16 +16,24 @@ class _SettingsViewState extends State<SettingsView> {
   final TextEditingController _modelController = TextEditingController();
   bool _testingConnection = false;
   String? _connectionResult;
+  String _selectedProvider = 'openai';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<SettingsProvider>();
-      provider.loadSettings();
-      _apiKeyController.text = provider.llmConfig.apiKey;
-      _baseUrlController.text = provider.llmConfig.baseUrl;
-      _modelController.text = provider.llmConfig.model;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitialSettings());
+  }
+
+  Future<void> _loadInitialSettings() async {
+    final provider = context.read<SettingsProvider>();
+    await provider.loadSettings();
+    if (!mounted) return;
+    final config = provider.llmConfig;
+    setState(() {
+      _selectedProvider = LLMProviderPreset.fromId(config.provider).id;
+      _apiKeyController.text = config.apiKey;
+      _baseUrlController.text = config.baseUrl;
+      _modelController.text = config.model;
     });
   }
 
@@ -54,30 +62,56 @@ class _SettingsViewState extends State<SettingsView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('支持 OpenAI 兼容接口（商汤日日新、DeepSeek、OpenAI 等）', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                  Text(
+                    '支持 OpenAI 兼容接口与 Claude 原生 Messages API；API Key 仅保存于设备安全存储。',
+                    style:
+                        theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '当前服务：${LLMProviderPreset.fromId(_selectedProvider).name} · ${LLMProviderPreset.fromId(_selectedProvider).description}',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.primary),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _apiKeyController,
-                    decoration: const InputDecoration(labelText: 'API Key', prefixIcon: Icon(Icons.key), hintText: 'sk-...'),
+                    decoration: const InputDecoration(
+                        labelText: 'API Key',
+                        prefixIcon: Icon(Icons.key),
+                        hintText: 'sk-...'),
                     obscureText: true,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _baseUrlController,
-                    decoration: const InputDecoration(labelText: 'Base URL', prefixIcon: Icon(Icons.link), hintText: 'https://api.openai.com/v1'),
+                    decoration: const InputDecoration(
+                        labelText: 'Base URL',
+                        prefixIcon: Icon(Icons.link),
+                        hintText: 'https://api.openai.com/v1'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _modelController,
-                    decoration: const InputDecoration(labelText: '模型名称', prefixIcon: Icon(Icons.psychology), hintText: 'gpt-4o-mini / deepseek-chat'),
+                    decoration: const InputDecoration(
+                        labelText: '模型名称',
+                        prefixIcon: Icon(Icons.psychology),
+                        hintText: 'gpt-4o-mini / deepseek-chat'),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _testingConnection ? null : _testConnection,
-                          icon: _testingConnection ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.sync),
+                          onPressed:
+                              _testingConnection ? null : _testConnection,
+                          icon: _testingConnection
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.sync),
                           label: const Text('测试连接'),
                         ),
                       ),
@@ -95,12 +129,25 @@ class _SettingsViewState extends State<SettingsView> {
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: _connectionResult!.contains('成功') ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(
+                          color: _connectionResult!.contains('成功')
+                              ? Colors.green.withOpacity(0.1)
+                              : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8)),
                       child: Row(
                         children: [
-                          Icon(_connectionResult!.contains('成功') ? Icons.check_circle : Icons.error, color: _connectionResult!.contains('成功') ? Colors.green : Colors.red, size: 18),
+                          Icon(
+                              _connectionResult!.contains('成功')
+                                  ? Icons.check_circle
+                                  : Icons.error,
+                              color: _connectionResult!.contains('成功')
+                                  ? Colors.green
+                                  : Colors.red,
+                              size: 18),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(_connectionResult!, style: theme.textTheme.bodySmall)),
+                          Expanded(
+                              child: Text(_connectionResult!,
+                                  style: theme.textTheme.bodySmall)),
                         ],
                       ),
                     ),
@@ -112,20 +159,39 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ),
           _buildSectionHeader('内容来源', theme),
-          ...['bilibili', 'xiaohongshu', 'douyin', 'zhihu', 'web'].map((platform) {
-            final labels = {'bilibili': 'B站', 'xiaohongshu': '小红书', 'douyin': '抖音', 'zhihu': '知乎', 'web': '通用网页'};
-            final requiresAuth = {'bilibili': false, 'xiaohongshu': true, 'douyin': true, 'zhihu': false, 'web': false};
+          ...['bilibili', 'xiaohongshu', 'douyin', 'zhihu', 'web']
+              .map((platform) {
+            final labels = {
+              'bilibili': 'B站',
+              'xiaohongshu': '小红书',
+              'douyin': '抖音',
+              'zhihu': '知乎',
+              'web': '通用网页'
+            };
+            final requiresAuth = {
+              'bilibili': false,
+              'xiaohongshu': true,
+              'douyin': true,
+              'zhihu': false,
+              'web': false
+            };
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: ListTile(
                 leading: _SourceIcon(platform: platform),
                 title: Text(labels[platform] ?? platform),
-                subtitle: requiresAuth[platform] == true ? const Text('需要登录 Cookie') : const Text('公开内容，无需登录'),
+                subtitle: requiresAuth[platform] == true
+                    ? const Text('需要登录 Cookie')
+                    : const Text('公开内容，无需登录'),
                 trailing: Switch(
                   value: provider.sourceEnabled[platform] ?? true,
-                  onChanged: (value) => provider.setSourceEnabled(platform, value),
+                  onChanged: (value) =>
+                      provider.setSourceEnabled(platform, value),
                 ),
-                onTap: requiresAuth[platform] == true ? () => _showCookieInput(platform, labels[platform] ?? platform) : null,
+                onTap: requiresAuth[platform] == true
+                    ? () =>
+                        _showCookieInput(platform, labels[platform] ?? platform)
+                    : null,
               ),
             );
           }),
@@ -160,7 +226,7 @@ class _SettingsViewState extends State<SettingsView> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('浮光'),
-                  subtitle: Text('v0.3.208 · 纯本地运行 · 无需服务器'),
+                  subtitle: Text('v0.3.210 · 纯本地运行 · 无需服务器'),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -188,25 +254,37 @@ class _SettingsViewState extends State<SettingsView> {
   Widget _buildSectionHeader(String title, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(title, style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.bold)),
+      child: Text(title,
+          style: theme.textTheme.titleSmall
+              ?.copyWith(color: Colors.grey, fontWeight: FontWeight.bold)),
     );
   }
 
   Widget _buildPresetButtons() {
     final presets = [
-      {'name': 'OpenAI', 'url': 'https://api.openai.com/v1', 'model': 'gpt-4o-mini'},
-      {'name': 'DeepSeek', 'url': 'https://api.deepseek.com/v1', 'model': 'deepseek-chat'},
-      {'name': '商汤日日新', 'url': 'https://token.sensenova.cn/v1', 'model': 'deepseek-v4-flash'},
+      ...LLMProviderPreset.presets,
+      LLMProviderPreset.custom,
     ];
     return Wrap(
       spacing: 8,
-      children: presets.map((p) => ActionChip(
-        label: Text(p['name']!),
-        onPressed: () {
-          _baseUrlController.text = p['url']!;
-          _modelController.text = p['model']!;
-        },
-      )).toList(),
+      runSpacing: 8,
+      children: presets.map((preset) {
+        final selected = _selectedProvider == preset.id;
+        return ChoiceChip(
+          label: Text(preset.name),
+          selected: selected,
+          onSelected: (_) {
+            setState(() {
+              _selectedProvider = preset.id;
+              _connectionResult = null;
+              if (preset.id != LLMProviderPreset.customId) {
+                _baseUrlController.text = preset.baseUrl;
+                _modelController.text = preset.model;
+              }
+            });
+          },
+        );
+      }).toList(),
     );
   }
 
@@ -219,19 +297,22 @@ class _SettingsViewState extends State<SettingsView> {
     final success = await context.read<SettingsProvider>().testLLMConnection();
     setState(() {
       _testingConnection = false;
-      _connectionResult = success ? '连接成功！LLM 服务可用。' : '连接失败，请检查 API Key 和 Base URL。';
+      _connectionResult =
+          success ? '连接成功！LLM 服务可用。' : '连接失败，请检查 API Key 和 Base URL。';
     });
   }
 
   Future<void> _saveLLMConfig({bool silent = false}) async {
     final config = LLMConfig(
+      provider: _selectedProvider,
       apiKey: _apiKeyController.text.trim(),
       baseUrl: _baseUrlController.text.trim(),
       model: _modelController.text.trim(),
     );
     await context.read<SettingsProvider>().updateLLMConfig(config);
     if (!silent && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('配置已保存')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('配置已保存')));
     }
   }
 
@@ -244,18 +325,27 @@ class _SettingsViewState extends State<SettingsView> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('在浏览器登录对应平台后，复制 Cookie 粘贴到下方：', style: TextStyle(fontSize: 13)),
+            const Text('在浏览器登录对应平台后，复制 Cookie 粘贴到下方：',
+                style: TextStyle(fontSize: 13)),
             const SizedBox(height: 12),
-            TextField(controller: controller, maxLines: 3, decoration: const InputDecoration(hintText: '粘贴 Cookie...', border: OutlineInputBorder())),
+            TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                    hintText: '粘贴 Cookie...', border: OutlineInputBorder())),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
           FilledButton(
             onPressed: () {
-              context.read<SettingsProvider>().setSourceCookies(platform, controller.text.trim());
+              context
+                  .read<SettingsProvider>()
+                  .setSourceCookies(platform, controller.text.trim());
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cookie 已保存')));
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('Cookie 已保存')));
             },
             child: const Text('保存'),
           ),
@@ -276,7 +366,7 @@ class _SettingsViewState extends State<SettingsView> {
             children: [
               Text('1. 所有行为数据、画像、对话历史均存储在本机 SQLite 数据库中，不会上传到任何服务器。'),
               SizedBox(height: 8),
-              Text('2. LLM 调用使用你自己配置的 API Key，请求直接发送到你配置的 LLM 服务商。'),
+              Text('2. API Key 使用设备安全存储保护；启用 LLM 后，请求会直接发送到你选择的服务商。'),
               SizedBox(height: 8),
               Text('3. 内容来源数据直接从各平台公开 API 获取，不经过任何中间服务器。'),
               SizedBox(height: 8),
@@ -284,7 +374,11 @@ class _SettingsViewState extends State<SettingsView> {
             ],
           ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('我知道了'))],
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('我知道了'))
+        ],
       ),
     );
   }
@@ -296,8 +390,26 @@ class _SourceIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icons = {'bilibili': Icons.play_circle_fill, 'xiaohongshu': Icons.book, 'douyin': Icons.music_note, 'zhihu': Icons.question_answer, 'web': Icons.language};
-    final colors = {'bilibili': const Color(0xFFFB7299), 'xiaohongshu': const Color(0xFFFF2442), 'douyin': Colors.black, 'zhihu': const Color(0xFF0066FF), 'web': Colors.grey};
-    return Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: (colors[platform] ?? Colors.grey).withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icons[platform] ?? Icons.language, color: colors[platform] ?? Colors.grey, size: 20));
+    final icons = {
+      'bilibili': Icons.play_circle_fill,
+      'xiaohongshu': Icons.book,
+      'douyin': Icons.music_note,
+      'zhihu': Icons.question_answer,
+      'web': Icons.language
+    };
+    final colors = {
+      'bilibili': const Color(0xFFFB7299),
+      'xiaohongshu': const Color(0xFFFF2442),
+      'douyin': Colors.black,
+      'zhihu': const Color(0xFF0066FF),
+      'web': Colors.grey
+    };
+    return Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+            color: (colors[platform] ?? Colors.grey).withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8)),
+        child: Icon(icons[platform] ?? Icons.language,
+            color: colors[platform] ?? Colors.grey, size: 20));
   }
 }

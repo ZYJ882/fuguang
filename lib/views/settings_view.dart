@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_providers.dart';
 import '../llm/llm_service.dart';
 
@@ -93,10 +94,16 @@ class _SettingsViewState extends State<SettingsView> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _modelController,
-                    decoration: const InputDecoration(
-                        labelText: '模型名称',
-                        prefixIcon: Icon(Icons.psychology),
-                        hintText: 'gpt-4o-mini / deepseek-chat'),
+                    decoration: InputDecoration(
+                      labelText: '模型名称',
+                      prefixIcon: const Icon(Icons.psychology),
+                      hintText: 'gpt-4o-mini / deepseek-chat',
+                      suffixIcon: IconButton(
+                        tooltip: '获取模型列表',
+                        onPressed: _showModelPicker,
+                        icon: const Icon(Icons.format_list_bulleted),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -226,7 +233,7 @@ class _SettingsViewState extends State<SettingsView> {
                 const ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('浮光'),
-                  subtitle: Text('v0.3.210 · 纯本地运行 · 无需服务器'),
+                  subtitle: Text('v0.3.211 · 纯本地运行 · 无需服务器'),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -239,8 +246,9 @@ class _SettingsViewState extends State<SettingsView> {
                 ListTile(
                   leading: const Icon(Icons.code),
                   title: const Text('开源项目'),
-                  subtitle: const Text('基于 OpenBiliClaw 复现'),
-                  onTap: () {},
+                  subtitle: const Text('GitHub · ZYJ882/fuguang'),
+                  trailing: const Icon(Icons.open_in_new, size: 20),
+                  onTap: _openProjectRepository,
                 ),
               ],
             ),
@@ -274,18 +282,154 @@ class _SettingsViewState extends State<SettingsView> {
           label: Text(preset.name),
           selected: selected,
           onSelected: (_) {
-            setState(() {
-              _selectedProvider = preset.id;
-              _connectionResult = null;
-              if (preset.id != LLMProviderPreset.customId) {
-                _baseUrlController.text = preset.baseUrl;
-                _modelController.text = preset.model;
-              }
-            });
+            _switchProvider(preset.id);
           },
         );
       }).toList(),
     );
+  }
+
+  Future<void> _switchProvider(String providerId) async {
+    await _saveLLMConfig(silent: true);
+    final config =
+        await context.read<SettingsProvider>().selectLLMProvider(providerId);
+    if (!mounted) return;
+    setState(() {
+      _selectedProvider = config.provider;
+      _apiKeyController.text = config.apiKey;
+      _baseUrlController.text = config.baseUrl;
+      _modelController.text = config.model;
+      _connectionResult = null;
+    });
+  }
+
+  Future<void> _showModelPicker() async {
+    await _saveLLMConfig(silent: true);
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    ModelListResult result = await settings.fetchLLMModels();
+    if (!mounted) return;
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? '无法加载模型列表')),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        var query = '';
+        var models = result.models;
+        var refreshing = false;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final visibleModels = models
+                .where((model) =>
+                    model.toLowerCase().contains(query.toLowerCase()))
+                .toList();
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Expanded(child: Text('可用模型列表')),
+                  IconButton(
+                    tooltip: '刷新列表',
+                    onPressed: refreshing
+                        ? null
+                        : () async {
+                            setDialogState(() => refreshing = true);
+                            final refreshed = await settings.fetchLLMModels();
+                            if (!dialogContext.mounted) return;
+                            setDialogState(() {
+                              refreshing = false;
+                              if (refreshed.isSuccess)
+                                models = refreshed.models;
+                            });
+                            if (!refreshed.isSuccess && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(refreshed.error ?? '无法刷新模型列表'),
+                                ),
+                              );
+                            }
+                          },
+                    icon: refreshing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 360,
+                height: 420,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: '搜索模型',
+                      ),
+                      onChanged: (value) => setDialogState(() => query = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: visibleModels.isEmpty
+                          ? const Center(child: Text('没有匹配的模型'))
+                          : ListView.separated(
+                              itemCount: visibleModels.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (_, index) {
+                                final model = visibleModels[index];
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(model),
+                                  trailing: model == _modelController.text
+                                      ? const Icon(Icons.check,
+                                          color: Colors.green)
+                                      : null,
+                                  onTap: () {
+                                    setState(() {
+                                      _modelController.text = model;
+                                      _connectionResult = null;
+                                    });
+                                    Navigator.of(dialogContext).pop();
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openProjectRepository() async {
+    final launched = await launchUrl(
+      Uri.parse('https://github.com/ZYJ882/fuguang'),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法打开 GitHub 项目链接')),
+      );
+    }
   }
 
   Future<void> _testConnection() async {

@@ -167,17 +167,32 @@ class LLMConfig {
         timeoutSeconds: (json['timeout_seconds'] as num?)?.toInt() ?? 60,
       );
 
+  static LLMConfig defaultsForProvider(String providerId) {
+    final preset = LLMProviderPreset.fromId(providerId);
+    return LLMConfig(
+      provider: preset.id,
+      baseUrl: preset.baseUrl,
+      model: preset.model,
+    );
+  }
+
   bool get isConfigured => validationError == null;
 
   bool get usesAnthropicMessages => provider == LLMProviderPreset.anthropicId;
 
-  String? get validationError {
+  String? get connectionValidationError {
     if (apiKey.trim().isEmpty) return '请填写 API Key';
     if (baseUrl.trim().isEmpty) return '请填写 Base URL';
     final uri = Uri.tryParse(baseUrl.trim());
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
       return 'Base URL 格式无效';
     }
+    return null;
+  }
+
+  String? get validationError {
+    final connectionError = connectionValidationError;
+    if (connectionError != null) return connectionError;
     if (model.trim().isEmpty) return '请填写模型名称';
     if (maxTokens <= 0) return '最大输出 Token 必须大于 0';
     if (timeoutSeconds <= 0) return '超时时间必须大于 0';
@@ -185,8 +200,17 @@ class LLMConfig {
   }
 }
 
+class ModelListResult {
+  final List<String> models;
+  final String? error;
+
+  const ModelListResult({this.models = const [], this.error});
+  bool get isSuccess => error == null;
+}
+
 class LLMService {
-  static const _apiKeyStorageKey = 'fuguang_llm_api_key_v1';
+  static const _legacyApiKeyStorageKey = 'fuguang_llm_api_key_v1';
+  static const _activeProviderStorageKey = 'llm_active_provider_v2';
   static const _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
@@ -200,32 +224,98 @@ class LLMService {
   LLMService._internal();
   static final LLMService instance = LLMService._internal();
 
+  String _normalizeProviderId(String providerId) {
+    final id = providerId.trim();
+    if (id.isEmpty || id == 'openai_compatible') {
+      return LLMProviderPreset.customId;
+    }
+    return LLMProviderPreset.fromId(id).id;
+  }
+
+  String _configStorageKey(String providerId) =>
+      'llm_provider_config_v2_${_normalizeProviderId(providerId)}';
+
+  String _apiKeyStorageKey(String providerId) =>
+      'fuguang_llm_api_key_v2_${_normalizeProviderId(providerId)}';
+
   Future<void> init() async {
-    LLMConfig loaded = const LLMConfig();
+    final activeProvider = await _repo.getConfig(_activeProviderStorageKey);
+    if (activeProvider?.trim().isNotEmpty ?? false) {
+      _config = await _loadProviderConfig(activeProvider!);
+      return;
+    }
+
+    final legacyConfig = await _loadLegacyConfig();
+    if (legacyConfig != null) {
+      final migratedProvider = await _migrateLegacyConfig(legacyConfig);
+      _config = await _loadProviderConfig(migratedProvider);
+      return;
+    }
+
+    _config = await _loadProviderConfig('openai');
+  }
+
+  Future<LLMConfig?> _loadLegacyConfig() async {
     final configStr = await _repo.getConfig('llm_config');
+    if (configStr == null) return null;
+    try {
+      return LLMConfig.fromJson(
+        Map<String, dynamic>.from(jsonDecode(configStr)),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _inferLegacyProvider(LLMConfig config) {
+    final normalizedBaseUrl =
+        config.baseUrl.trim().replaceAll(RegExp(r'/+$'), '').toLowerCase();
+    for (final preset in LLMProviderPreset.presets) {
+      final presetBaseUrl =
+          preset.baseUrl.trim().replaceAll(RegExp(r'/+$'), '').toLowerCase();
+      if (normalizedBaseUrl == presetBaseUrl) return preset.id;
+    }
+    return _normalizeProviderId(config.provider);
+  }
+
+  Future<String> _migrateLegacyConfig(LLMConfig legacyConfig) async {
+    final providerId = _inferLegacyProvider(legacyConfig);
+    final legacySecureKey = await _secureStorage.read(
+      key: _legacyApiKeyStorageKey,
+    );
+    final apiKey = legacySecureKey?.trim().isNotEmpty == true
+        ? legacySecureKey!.trim()
+        : legacyConfig.apiKey.trim();
+    final migrated =
+        legacyConfig.copyWith(provider: providerId, apiKey: apiKey);
+    await _saveProviderConfig(migrated);
+    await _repo.setConfig(_activeProviderStorageKey, providerId);
+    await _repo.setConfig(
+      'llm_config',
+      jsonEncode(
+        migrated.copyWith(apiKey: '').toJson(includeApiKey: false),
+      ),
+    );
+    await _secureStorage.delete(key: _legacyApiKeyStorageKey);
+    return providerId;
+  }
+
+  Future<LLMConfig> _loadProviderConfig(String providerId) async {
+    final normalizedProvider = _normalizeProviderId(providerId);
+    var config = LLMConfig.defaultsForProvider(normalizedProvider);
+    final configStr =
+        await _repo.getConfig(_configStorageKey(normalizedProvider));
     if (configStr != null) {
       try {
-        loaded = LLMConfig.fromJson(
+        config = LLMConfig.fromJson(
           Map<String, dynamic>.from(jsonDecode(configStr)),
-        );
-      } catch (_) {
-        loaded = const LLMConfig();
-      }
+        ).copyWith(provider: normalizedProvider);
+      } catch (_) {}
     }
-
-    final storedKey = await _secureStorage.read(key: _apiKeyStorageKey);
-    final legacyKey = loaded.apiKey.trim();
-    final resolvedKey =
-        (storedKey?.trim().isNotEmpty ?? false) ? storedKey!.trim() : legacyKey;
-
-    if (legacyKey.isNotEmpty && (storedKey?.trim().isEmpty ?? true)) {
-      await _secureStorage.write(key: _apiKeyStorageKey, value: legacyKey);
-    }
-    _config = loaded.copyWith(apiKey: resolvedKey);
-
-    if (legacyKey.isNotEmpty) {
-      await _persistConfigWithoutApiKey(_config);
-    }
+    final apiKey = await _secureStorage.read(
+      key: _apiKeyStorageKey(normalizedProvider),
+    );
+    return config.copyWith(apiKey: apiKey?.trim() ?? '');
   }
 
   LLMConfig get config => _config;
@@ -233,33 +323,91 @@ class LLMService {
   int get totalRequests => _totalRequests;
   int get totalTokens => _totalTokens;
 
+  Future<LLMConfig> selectProvider(String providerId) async {
+    final normalizedProvider = _normalizeProviderId(providerId);
+    _config = await _loadProviderConfig(normalizedProvider);
+    await _repo.setConfig(_activeProviderStorageKey, normalizedProvider);
+    return _config;
+  }
+
   Future<void> updateConfig(LLMConfig config) async {
+    final providerId = _normalizeProviderId(config.provider);
     final normalized = config.copyWith(
-      provider: config.provider.trim().isEmpty
-          ? LLMProviderPreset.customId
-          : config.provider.trim(),
+      provider: providerId,
       apiKey: config.apiKey.trim(),
       baseUrl: config.baseUrl.trim().replaceAll(RegExp(r'/+$'), ''),
       model: config.model.trim(),
     );
-
-    if (normalized.apiKey.isEmpty) {
-      await _secureStorage.delete(key: _apiKeyStorageKey);
-    } else {
-      await _secureStorage.write(
-        key: _apiKeyStorageKey,
-        value: normalized.apiKey,
-      );
-    }
+    await _saveProviderConfig(normalized);
+    await _repo.setConfig(_activeProviderStorageKey, providerId);
     _config = normalized;
-    await _persistConfigWithoutApiKey(normalized);
   }
 
-  Future<void> _persistConfigWithoutApiKey(LLMConfig config) {
-    return _repo.setConfig(
-      'llm_config',
+  Future<void> _saveProviderConfig(LLMConfig config) async {
+    final providerId = _normalizeProviderId(config.provider);
+    if (config.apiKey.isEmpty) {
+      await _secureStorage.delete(key: _apiKeyStorageKey(providerId));
+    } else {
+      await _secureStorage.write(
+        key: _apiKeyStorageKey(providerId),
+        value: config.apiKey,
+      );
+    }
+    await _repo.setConfig(
+      _configStorageKey(providerId),
       jsonEncode(config.copyWith(apiKey: '').toJson(includeApiKey: false)),
     );
+  }
+
+  Future<ModelListResult> fetchModels() async {
+    final connectionError = _config.connectionValidationError;
+    if (connectionError != null) {
+      return ModelListResult(error: connectionError);
+    }
+    try {
+      final response = await _client
+          .get(
+            _endpoint('/models'),
+            headers: _config.usesAnthropicMessages
+                ? {
+                    'x-api-key': _config.apiKey,
+                    'anthropic-version': '2023-06-01',
+                  }
+                : {'Authorization': 'Bearer ${_config.apiKey}'},
+          )
+          .timeout(Duration(seconds: _config.timeoutSeconds));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return ModelListResult(error: _httpError(response));
+      }
+      final decoded = Map<String, dynamic>.from(jsonDecode(response.body));
+      final entries = decoded['data'] is List
+          ? decoded['data'] as List
+          : decoded['models'] is List
+              ? decoded['models'] as List
+              : const <dynamic>[];
+      final models = entries
+          .whereType<Map>()
+          .map(
+            (entry) => (entry['id'] ?? entry['name'] ?? entry['model'])
+                ?.toString()
+                .trim(),
+          )
+          .whereType<String>()
+          .where((model) => model.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      if (models.isEmpty) {
+        return const ModelListResult(error: '服务未返回可选模型列表');
+      }
+      return ModelListResult(models: models);
+    } on TimeoutException {
+      return const ModelListResult(error: '加载模型列表超时');
+    } on FormatException {
+      return const ModelListResult(error: '模型列表响应格式无效');
+    } catch (e) {
+      return ModelListResult(error: '加载模型列表失败: $e');
+    }
   }
 
   Future<LLMResponse> chat({

@@ -111,16 +111,34 @@ class RecommendProvider extends ChangeNotifier {
     _recommendations = _recommendations.map((r) {
       if (r.itemKey == rec.itemKey) {
         return Recommendation(
-          id: r.id, bvid: r.bvid, itemKey: r.itemKey, contentId: r.contentId,
-          title: r.title, upName: r.upName, coverUrl: r.coverUrl,
-          expression: r.expression, topicLabel: r.topicLabel, contentUrl: r.contentUrl,
-          sourcePlatform: r.sourcePlatform, contentType: r.contentType,
-          bodyText: r.bodyText, publishedAt: r.publishedAt, publishedLabel: r.publishedLabel,
-          viewCount: r.viewCount, likeCount: r.likeCount, commentCount: r.commentCount,
-          favoriteCount: r.favoriteCount, danmakuCount: r.danmakuCount,
-          ratingScore: r.ratingScore, ratingCount: r.ratingCount, sourceRank: r.sourceRank,
-          duration: r.duration, tags: r.tags, feedbackType: feedbackType,
-          matchScore: r.matchScore, recommendReason: r.recommendReason,
+          id: r.id,
+          bvid: r.bvid,
+          itemKey: r.itemKey,
+          contentId: r.contentId,
+          title: r.title,
+          upName: r.upName,
+          coverUrl: r.coverUrl,
+          expression: r.expression,
+          topicLabel: r.topicLabel,
+          contentUrl: r.contentUrl,
+          sourcePlatform: r.sourcePlatform,
+          contentType: r.contentType,
+          bodyText: r.bodyText,
+          publishedAt: r.publishedAt,
+          publishedLabel: r.publishedLabel,
+          viewCount: r.viewCount,
+          likeCount: r.likeCount,
+          commentCount: r.commentCount,
+          favoriteCount: r.favoriteCount,
+          danmakuCount: r.danmakuCount,
+          ratingScore: r.ratingScore,
+          ratingCount: r.ratingCount,
+          sourceRank: r.sourceRank,
+          duration: r.duration,
+          tags: r.tags,
+          feedbackType: feedbackType,
+          matchScore: r.matchScore,
+          recommendReason: r.recommendReason,
         );
       }
       return r;
@@ -258,8 +276,10 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> respondToConfirmation(String ref, String response, {String? discussion}) async {
-    await _engine.respondToConfirmation(ref: ref, response: response, discussion: discussion);
+  Future<void> respondToConfirmation(String ref, String response,
+      {String? discussion}) async {
+    await _engine.respondToConfirmation(
+        ref: ref, response: response, discussion: discussion);
     await loadNotifications();
   }
 }
@@ -375,7 +395,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _llmConfig = _llm.config;
-      for (final platform in ['bilibili', 'xiaohongshu', 'douyin', 'zhihu', 'web']) {
+      for (final platform in [
+        'bilibili',
+        'xiaohongshu',
+        'douyin',
+        'zhihu',
+        'web'
+      ]) {
         final config = _sources.getConfig(platform);
         _sourceEnabled[platform] = config?.enabled ?? true;
       }
@@ -389,8 +415,18 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> updateLLMConfig(LLMConfig config) async {
     await _llm.updateConfig(config);
-    _llmConfig = config;
+    _llmConfig = _llm.config;
     notifyListeners();
+  }
+
+  Future<LLMConfig> selectLLMProvider(String providerId) async {
+    _llmConfig = await _llm.selectProvider(providerId);
+    notifyListeners();
+    return _llmConfig;
+  }
+
+  Future<ModelListResult> fetchLLMModels() async {
+    return _llm.fetchModels();
   }
 
   Future<bool> testLLMConnection() async {
